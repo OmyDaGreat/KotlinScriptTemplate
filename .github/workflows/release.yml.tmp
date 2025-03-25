@@ -32,8 +32,7 @@ jobs:
       BUCKET_LOCATION: OmyDaGreat/MaleficBucket
       BUCKET_NAME: malefic
       DESCRIPTION: A Kotlin-based conventional commit message generator
-      JAVA_VERSION: '21'
-      KOTLIN_VERSION: '2.1.10'
+      KOTLIN_VERSION: '2.1.20'
 
     steps:
       - name: Checkout code
@@ -45,7 +44,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
+          java-version: 21
 
       - name: Setup Kotlin
         uses: fwilhe2/setup-kotlin@v1
@@ -91,15 +90,26 @@ jobs:
           echo "version=$new_version" >> $GITHUB_OUTPUT
           echo "tag=v$new_version" >> $GITHUB_OUTPUT
 
-      - name: Compile Kotlin Application
+      - name: Get latest commit message
+        id: commit_message
         run: |
-          mkdir -p build
-          kotlinc ${{ env.KT_NAME }}.kt -include-runtime -d build/${{ env.APP_NAME }}.jar
+          latest_commit_message=$(git log -1 --pretty=format:%s)
+          echo "latest_commit_message=$latest_commit_message" >> $GITHUB_OUTPUT
+
+      - name: Make Gradlew executable
+        run: chmod +x gradlew
+
+      - name: Compile Kotlin Application
+        run: ./gradlew shadowJar
+                env:
+                  JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64
+                  JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.6-7/x64
+                  KOTLIN_HOME: /opt/hostedtoolcache/kotlin/2.1.10/x64/kotlinc
 
       - name: Prepare Files for Packaging
         run: |
           mkdir -p package
-          cp build/${{ env.APP_NAME }}.jar package/
+          cp app/build/libs/${{ env.APP_NAME }}.jar package/
           cp LICENSE package/ || echo "LICENSE file not found"
           cp README.adoc package/ || echo "README.adoc file not found"
 
@@ -185,4 +195,4 @@ jobs:
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
           repository: ${{ env.BUCKET_LOCATION }}
           event-type: update-${{ env.APP_NAME }}
-          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}"}'
+          client-payload: '{"version": "${{ steps.version.outputs.version }}", "sha256": "${{ steps.sha.outputs.sha256 }}", "tag": "${{ steps.version.outputs.tag }}", "latest_commit_message": "${{ steps.commit_message.outputs.latest_commit_message }}"}'
